@@ -33,16 +33,20 @@ def list_links(limit: int = 10):
         "limit": limit
     }
 
-
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request, exc):
     errors = []
+
     for err in exc.errors():
-        loc = err["loc"]            # e.g. ("query", "limit") or ("body", "url")
+        loc = err["loc"]
+
         errors.append({
-            "field": str(loc[-1]),      # last item = the field name
-            "location": str(loc[0]),    # "query", "body", "path", ...
+            "field": str(loc[-1]),
+            "location": str(loc[0]),
             "message": err["msg"],
         })
 
-    return JSONResponse(status_code=400, content={"detail": errors})
+    return JSONResponse(
+        status_code=400,
+        content={"detail": errors}
+    )
