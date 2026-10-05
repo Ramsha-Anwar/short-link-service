@@ -1,24 +1,45 @@
+import secrets
+import string
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError 
 from fastapi.responses import JSONResponse
-
 from app.schemas import LinkCreate
 
 
 app = FastAPI()
-
+links = {}
 
 @app.get("/")
 def root():
     return {"message": "Short Link Service API"}
 
+def generate_code(length: int = 6):
+    characters = string.ascii_letters + string.digits
+    return "".join(secrets.choice(characters) for _ in range(length))
 
 @app.post("/links")
 def create_link(link: LinkCreate):
-    return {
-        "url": link.url
-    }
+    url = str(link.url)
 
+    for code, stored_url in links.items():
+        if stored_url == url:
+            return {
+                "code": code,
+                "url": url
+            }
+
+    while True:
+        code = generate_code()
+
+        if code not in links:
+            break
+
+    links[code] = url
+
+    return {
+        "code": code,
+        "url": url
+    }
 
 @app.get("/links/{code}")
 def get_link(code: str):
