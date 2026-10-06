@@ -1,28 +1,31 @@
 import secrets
 import string
-from fastapi import FastAPI
-from fastapi.exceptions import RequestValidationError 
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, HTTPException
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse, RedirectResponse
 from app.schemas import LinkCreate
 
 
 app = FastAPI()
 links = {}
 
+
 @app.get("/")
 def root():
     return {"message": "Short Link Service API"}
+
 
 def generate_code(length: int = 6):
     characters = string.ascii_letters + string.digits
     return "".join(secrets.choice(characters) for _ in range(length))
 
+
 @app.post("/links")
 def create_link(link: LinkCreate):
     url = str(link.url)
 
-    for code, stored_url in links.items():
-        if stored_url == url:
+    for code, link_data in links.items():
+        if link_data["url"] == url:
             return {
                 "code": code,
                 "url": url
@@ -30,29 +33,55 @@ def create_link(link: LinkCreate):
 
     while True:
         code = generate_code()
-
         if code not in links:
             break
 
-    links[code] = url
+    links[code] = {
+        "url": url,
+        "clicks": 0
+    }
 
     return {
         "code": code,
         "url": url
     }
 
+
 @app.get("/links/{code}")
 def get_link(code: str):
-    return {
-        "code": code
-    }
+    if code not in links:
+        raise HTTPException(
+            status_code=404,
+            detail="Short link not found"
+        )
 
+    links[code]["clicks"] += 1
+
+    return RedirectResponse(
+        url=links[code]["url"],
+        status_code=302
+    )
+
+@app.get("/links/{code}/stats")
+def get_link_stats(code: str):
+    if code not in links:
+        raise HTTPException(
+            status_code=404,
+            detail="Short link not found"
+        )
+
+    return {
+        "code": code,
+        "url": links[code]["url"],
+        "clicks": links[code]["clicks"]
+    }
 
 @app.get("/links")
 def list_links(limit: int = 10):
     return {
         "limit": limit
     }
+
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request, exc):
